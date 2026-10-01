@@ -68,9 +68,9 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - name: Build the web UI for the controller image
         run: pnpm install --frozen-lockfile && pnpm --filter @continuum/web build
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with: { distribution: goreleaser, version: "~> v2", args: check }
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with: { distribution: goreleaser, version: "~> v2", args: release --clean }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
