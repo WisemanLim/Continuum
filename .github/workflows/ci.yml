@@ -14,7 +14,7 @@ jobs:
     env: { CGO_ENABLED: "0" }
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - run: go vet ./...
       # release gate (PRD §18.2 P1): FR-P08 spillover reproduction must pass on every OS
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - name: govulncheck (reachable vulnerabilities in Go dependencies)
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - run: go test -race ./... -count=1
 
@@ -66,7 +66,7 @@ jobs:
     env: { CONTINUUM_TEST_PG: "postgresql://app:ci-only@127.0.0.1:5432/postgres" }
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - run: go test ./internal/... -count=1 -p 2
 
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - uses: pnpm/action-setup@v4
         with: { version: 11 }
@@ -97,7 +97,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - uses: pnpm/action-setup@v4
         with: { version: 11 }
