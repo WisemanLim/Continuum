@@ -89,7 +89,7 @@ jobs:
         run: pnpm --filter @continuum/web e2e
       - name: extension E2E (T1 side panel + console)
         run: pnpm --filter @continuum/extension e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: { name: e2e-evidence, path: test/impl/**/logs/*.png, if-no-files-found: ignore }
 
