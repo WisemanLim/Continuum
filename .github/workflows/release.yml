@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - name: FR-P08 spillover gate
         run: go test ./internal/placement ./internal/transfer -run 'FRP08' -count=1 -v
@@ -45,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - uses: sigstore/cosign-installer@v3
       - uses: anchore/sbom-action/download-syft@v0
@@ -111,7 +111,7 @@ jobs:
       HAS_APPLE_KEY: ${{ secrets.MACOS_NOTARY_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with: { go-version-file: go.mod }
       - uses: pnpm/action-setup@v4
         with: { version: 11 }
