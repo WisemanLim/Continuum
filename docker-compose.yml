@@ -1,0 +1,52 @@
+# continuum — M2 중앙 서버 스택 (controller + postgres, --profile agents 로 Agent 추가)
+# local(M1) 은 SQLite 라 기본적으로 이 파일을 쓰지 않음 (LOCAL_INFRA=postgres 로 선택 기동 가능)
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-continuum}
+    ports: ["${BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-app}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  controller:
+    profiles: ["app"]
+    build: { context: ., dockerfile: Dockerfile, target: controller }
+    env_file: [".env.${ENV:-dev}"]
+    environment:
+      CONTINUUM_AGENT_ADDR: ":8443"                     # mTLS agent endpoint (FR-S03)
+      CONTINUUM_AGENT_URL: "${CONTINUUM_AGENT_URL:-https://controller:8443}"
+      CONTINUUM_PKI_DIR: /data/pki                      # CA key stays in this volume
+      CONTINUUM_ACCESS_DIR: /data/access
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${API_PORT:-8080}:8080"
+      - "${BIND_HOST:-127.0.0.1}:${AGENT_PORT:-8443}:8443"
+    volumes: ["controller-data:/data"]
+    depends_on:
+      postgres: { condition: service_healthy }
+  # Central mode (FR-N08): agents enroll once with a token from `continuum node token`, then reconnect with
+  # their certificate from the state volume. CONTINUUM_ENROLL_TOKEN is only read on the first start.
+  agent:
+    profiles: ["agents"]
+    build: { context: ., dockerfile: Dockerfile, target: agent }
+    command: ["run", "--controller", "https://controller:8443", "--root", "/disks/d1"]
+    environment:
+      CONTINUUM_ENROLL_TOKEN: "${CONTINUUM_ENROLL_TOKEN:-}"
+    volumes: ["agent-state:/state", "agent-disk1:/disks/d1"]
+    depends_on: [controller]
+  # SMB 게이트웨이 (Phase 2, FR-A01) — Samba(GPL-3.0) 는 별도 컨테이너로 프로세스 분리. Controller 가 smb.conf 생성·reload.
+  # samba:
+  #   profiles: ["app"]
+  #   image: <samba 이미지 선정 후 지정>
+  #   ports: ["${BIND_HOST:-127.0.0.1}:445:445"]
+  #   volumes: ["./deploy/samba/smb.conf:/etc/samba/smb.conf:ro"]
+volumes:
+  pgdata:
+  controller-data:
+  agent-state:
+  agent-disk1:

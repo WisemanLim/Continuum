@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist]
+"1"="EXTENSION_ID;https://clients2.google.com/service/update2/crx"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\NativeMessagingAllowlist]
+"1"="com.continuum.agent"

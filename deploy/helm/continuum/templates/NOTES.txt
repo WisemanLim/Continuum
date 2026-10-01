@@ -1,0 +1,10 @@
+Continuum Controller {{ .Chart.AppVersion }} deployed.
+
+UI/API: kubectl port-forward svc/{{ include "continuum.fullname" . }} 8080:{{ .Values.service.apiPort }}
+        open http://127.0.0.1:8080/ (web UI is in the image) · continuum --controller http://127.0.0.1:8080 version
+{{- if .Values.agent.enabled }}
+Agents: expose svc/{{ include "continuum.fullname" . }}-agent ({{ .Values.service.agentPort }}/TCP, mTLS passthrough) and set
+        agent.publicURL to the address agents dial; enroll with `continuum node token`.
+{{- end }}
+First login: create the system admin with `continuum user add <name> --role system-admin` (single-user mode
+is open until the first user exists — keep the API private or set apiToken.existingSecret until then).

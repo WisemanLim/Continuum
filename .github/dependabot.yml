@@ -1,0 +1,20 @@
+# Dependency updates (FR-S08): weekly, grouped; security updates are raised immediately by GitHub.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly }
+    groups: { go: { patterns: ["*"] } }
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups: { npm: { patterns: ["*"] } }
+  - package-ecosystem: cargo
+    directory: /apps/desktop/src-tauri
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /deploy/release
+    schedule: { interval: weekly }

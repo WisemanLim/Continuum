@@ -1,0 +1,7 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "exclude": ["e2e", "playwright.config.ts", ".output", "node_modules"]
+}

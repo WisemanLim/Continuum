@@ -1,0 +1,112 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  go:
+    # Controller · Agent · CLI on 3 OSes (FR-R05, PRD §15.3)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14, windows-2022] # PRD FR-R05 runner set (macOS Intel is covered by cross builds)
+    runs-on: ${{ matrix.os }}
+    env: { CGO_ENABLED: "0" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - run: go vet ./...
+      # release gate (PRD §18.2 P1): FR-P08 spillover reproduction must pass on every OS
+      - name: FR-P08 spillover gate
+        run: go test ./internal/placement ./internal/transfer -run 'FRP08' -count=1 -v
+      - run: go test ./... -count=1
+      - run: go build ./...
+
+  supply-chain:
+    # FR-S08: known vulnerabilities, license inventory, reproducible builds
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - name: govulncheck (reachable vulnerabilities in Go dependencies)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: license inventory (fails on a dependency without a license)
+        run: go run ./tools/notices -o /tmp/notices.md
+      - name: reproducible build (two clean builds must be byte-identical)
+        run: scripts/repro-check.sh
+      - name: release configuration (goreleaser / workflows / extension policy, offline)
+        run: pip install pyyaml && python3 scripts/release-lint.py
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: npm advisories (production dependencies)
+        run: pnpm audit --prod --audit-level high
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - run: go test -race ./... -count=1
+
+  postgres:
+    # central mode (FR-N08): the same suites on PostgreSQL — each test gets its own database
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_USER: app, POSTGRES_PASSWORD: ci-only, POSTGRES_DB: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U app" --health-interval 2s --health-retries 30
+    env: { CONTINUUM_TEST_PG: "postgresql://app:ci-only@127.0.0.1:5432/postgres" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - run: go test ./internal/... -count=1 -p 2
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @continuum/web test
+      - run: pnpm --filter @continuum/web build
+      - run: pnpm --filter @continuum/extension build
+      - run: pnpm --filter @continuum/web exec playwright install --with-deps chromium chrome
+      - name: web E2E (real browser + real controller)
+        run: pnpm --filter @continuum/web e2e
+      - name: extension E2E (T1 side panel + console)
+        run: pnpm --filter @continuum/extension e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: e2e-evidence, path: test/impl/**/logs/*.png, if-no-files-found: ignore }
+
+  desktop:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @continuum/web build
+      - run: pnpm --filter @continuum/desktop sidecar
+      - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
+  # signed bundles (dmg/pkg/msi/deb/AppImage), notarization and store upload run in the tag-triggered
+  # release workflow (PRD §15.3 ⑤–⑦); signing secrets are never stored in this repository.

@@ -1,0 +1,38 @@
+# E23 live test: same topology as docker-compose.yml (--profile app --profile agents), but with images already
+# on this machine (no pulls): prebuilt linux binaries are bind-mounted into debian:bookworm-slim.
+name: ctm-central
+services:
+  postgres:
+    image: postgres:17
+    environment: { POSTGRES_USER: app, POSTGRES_PASSWORD: test-only-pass, POSTGRES_DB: continuum }
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U app"], interval: 2s, retries: 30 }
+  controller:
+    image: debian:bookworm-slim
+    command: ["/bin/controller"]
+    environment:
+      DATABASE_URL: postgresql://app:test-only-pass@postgres:5432/continuum?sslmode=disable
+      CONTROLLER_ADDR: ":8080"
+      CONTINUUM_AGENT_ADDR: ":8443"
+      CONTINUUM_AGENT_URL: https://controller:8443
+      CONTINUUM_AGENT_HEARTBEAT_SEC: "2"
+      CONTINUUM_PKI_DIR: /data/pki
+      CONTINUUM_ACCESS_DIR: /data/access
+      CONTINUUM_AGENT_SANS: controller
+    ports: ["127.0.0.1:18180:8080"]
+    volumes: ["${BIN}/controller:/bin/controller:ro", "controller-data:/data", "${SRC}:/src:ro"]
+    depends_on: { postgres: { condition: service_healthy } }
+  agent-a:
+    image: debian:bookworm-slim
+    hostname: central-agent-a
+    command: ["/bin/continuum-agent", "run", "--controller", "https://controller:8443", "--root", "/disks/d1"]
+    environment: { CONTINUUM_AGENT_DIR: /state, CONTINUUM_ENROLL_TOKEN: "${TOKEN_A:-}" }
+    volumes: ["${BIN}/agent:/bin/continuum-agent:ro", "state-a:/state", "disk-a:/disks/d1"]
+    restart: unless-stopped
+  agent-b:
+    image: debian:bookworm-slim
+    hostname: central-agent-b
+    command: ["/bin/continuum-agent", "run", "--controller", "https://controller:8443", "--root", "/disks/d1"]
+    environment: { CONTINUUM_AGENT_DIR: /state, CONTINUUM_ENROLL_TOKEN: "${TOKEN_B:-}" }
+    volumes: ["${BIN}/agent:/bin/continuum-agent:ro", "state-b:/state", "disk-b:/disks/d1"]
+    restart: unless-stopped
+volumes: { controller-data: {}, state-a: {}, state-b: {}, disk-a: {}, disk-b: {} }

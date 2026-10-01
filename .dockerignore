@@ -1,0 +1,8 @@
+.git
+.docs
+.make
+node_modules
+apps
+test/**/logs
+*.db
+.env*

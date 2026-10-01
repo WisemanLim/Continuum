@@ -1,0 +1,140 @@
+# goreleaser v2 — CLI · Controller · Agent (FR-R02, R03, R05, S08, NFR-S04, PRD §15.1–15.3).
+# Local dry run (no signing): goreleaser release --snapshot --clean --skip=sign,notarize,docker
+# Every secret below is read from the CI environment; nothing secret is stored in this repository.
+version: 2
+project_name: continuum
+
+before:
+  hooks:
+    - go mod tidy
+    - go run ./tools/notices -o THIRD_PARTY_NOTICES.md # license notices shipped in every archive (FR-R07)
+
+# Reproducible builds (FR-S08): no paths, no build ids, commit time as mtime → identical bytes per commit.
+builds:
+  - &build
+    id: continuum
+    main: ./cmd/continuum
+    binary: continuum
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -buildid= -X continuum/internal/version.Version={{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+  - <<: *build
+    id: controller
+    main: ./cmd/controller
+    binary: continuum-controller
+  - <<: *build
+    id: agent
+    main: ./cmd/agent
+    binary: continuum-agent
+
+archives:
+  - id: default
+    ids: [continuum, controller, agent]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [README.md, README.en.md, LICENSE*, THIRD_PARTY_NOTICES.md, docs/optional-dependencies.md]
+
+checksum:
+  name_template: checksums.txt
+
+nfpms: # Linux packages; `continuum-agent service install` writes the systemd unit (FR-N04)
+  - id: packages
+    ids: [continuum, controller, agent]
+    package_name: continuum
+    maintainer: Continuum maintainers
+    description: Ordinal-based cross-platform disk pooling (CLI, controller, agent)
+    formats: [deb, rpm]
+    contents:
+      - src: THIRD_PARTY_NOTICES.md
+        dst: /usr/share/doc/continuum/THIRD_PARTY_NOTICES.md
+    suggests: [fuse3, mergerfs] # native VFS / local mergerfs mode (optional, FR-R07)
+
+sboms: # SPDX SBOM per archive and package (FR-S08, PRD §15.3 ⑥) — syft is installed by the release workflow
+  - id: archives
+    artifacts: archive
+  - id: packages
+    artifacts: package
+
+# macOS: sign + notarize the binaries (Apple Developer ID, notarytool API key) — FR-R03.
+# Enabled only when the CI secrets exist, so forks and snapshots still build.
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      ids: [continuum, controller, agent]
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"       # base64 .p12
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"            # base64 AuthKey_*.p8
+        wait: true
+
+# Windows: Authenticode via Azure Trusted Signing (jsign) on the .exe files — FR-R03.
+binary_signs:
+  - id: windows-authenticode
+    if: '{{ and (eq .Os "windows") (isEnvSet "AZURE_SIGNING_ACCOUNT") }}'
+    cmd: jsign
+    args:
+      - --storetype=TRUSTEDSIGNING
+      - --keystore={{ .Env.AZURE_SIGNING_ENDPOINT }}
+      - --storepass={{ .Env.AZURE_ACCESS_TOKEN }}
+      - --alias={{ .Env.AZURE_SIGNING_ACCOUNT }}/{{ .Env.AZURE_SIGNING_PROFILE }}
+      - --tsaurl=http://timestamp.acs.microsoft.com
+      - --tsmode=RFC3161
+      - ${artifact}
+    signature: "" # in-place Authenticode signature
+    output: false
+
+# Sigstore keyless signing of the checksum file (covers every archive) — needs `id-token: write` in CI.
+signs:
+  - id: cosign
+    cmd: cosign
+    certificate: "${artifact}.pem"
+    signature: "${artifact}.sig"
+    artifacts: checksum
+    args: ["sign-blob", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}", "--yes"]
+  # Linux repositories: detached GPG signature (key imported from a CI secret)
+  - id: gpg
+    if: '{{ isEnvSet "GPG_FINGERPRINT" }}'
+    artifacts: checksum
+    signature: "${artifact}.asc"
+    args: ["--batch", "--local-user", "{{ .Env.GPG_FINGERPRINT }}", "--armor", "--output", "${signature}", "--detach-sign", "${artifact}"]
+
+dockers_v2:
+  - id: controller
+    ids: [controller, continuum]
+    dockerfile: deploy/release/Dockerfile.controller
+    extra_files: [{ src: apps/web/dist, dst: web }] # built by the release workflow before goreleaser
+    images: ["ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/continuum-controller"]
+    tags: ["{{ .Version }}", "latest"]
+    platforms: [linux/amd64, linux/arm64]
+    sbom: true
+  - id: agent
+    ids: [agent]
+    dockerfile: deploy/release/Dockerfile.agent
+    images: ["ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/continuum-agent"]
+    tags: ["{{ .Version }}", "latest"]
+    platforms: [linux/amd64, linux/arm64]
+    sbom: true
+
+docker_signs: # keyless cosign signatures for the images
+  - cmd: cosign
+    artifacts: manifests
+    args: ["sign", "${artifact}@${digest}", "--yes"]
+
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
+
+release:
+  footer: |
+    Verify: `cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig --certificate-identity-regexp 'https://github.com/{{ .Env.GITHUB_REPOSITORY }}/' --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt`
+    then `sha256sum -c checksums.txt`. SBOMs (`*.sbom.json`) and build provenance attestations are attached.

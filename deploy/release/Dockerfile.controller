@@ -1,0 +1,10 @@
+# Release image built by goreleaser from the already-compiled, signed binaries (no compiler in the image).
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/continuum-controller /controller
+COPY ${TARGETPLATFORM}/continuum /continuum
+COPY web /web
+ENV CONTINUUM_WEB_DIR=/web
+EXPOSE 8080 8443
+USER 65532:65532
+ENTRYPOINT ["/controller"]

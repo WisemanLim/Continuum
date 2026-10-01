@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-hosted update manifest (outside the stores): host continuum.crx next to it over HTTPS. -->
+<gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
+  <app appid="EXTENSION_ID">
+    <updatecheck codebase="https://downloads.example.com/continuum/continuum.crx" version="0.0.0" />
+  </app>
+</gupdate>

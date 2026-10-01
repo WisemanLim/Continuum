@@ -1,0 +1,17 @@
+{
+  "name": "@continuum/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "pnpm sidecar && tauri dev",
+    "build": "pnpm sidecar && tauri build",
+    "sidecar": "mkdir -p src-tauri/binaries && cd ../.. && CGO_ENABLED=0 go build -o apps/desktop/src-tauri/binaries/continuum-controller-$(rustc -vV | sed -n \"s/host: //p\") ./cmd/controller"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

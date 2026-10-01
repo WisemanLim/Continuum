@@ -1,0 +1,8 @@
+# continuum — Procfile (local 멀티프로세스 / goreman)
+# 사전: go install github.com/mattn/goreman@latest
+# 실행: make local-all  (= goreman -f Procfile.dev start) — 통합 로그, 별도 터미널서 goreman run status/restart-all
+# 핫리로드를 원하면 'go run' 대신 'air' 사용
+controller: go run ./cmd/controller
+web: pnpm --filter @continuum/web dev
+# 데스크톱 셸(Tauri) 은 web 을 자체 기동하므로 별도 터미널에서: pnpm --filter @continuum/desktop tauri dev
+# 확장(wxt) 개발: pnpm --filter @continuum/extension dev

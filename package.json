@@ -1,0 +1,11 @@
+{
+  "name": "continuum",
+  "private": true,
+  "description": "Continuum — web UI / desktop shell / Chrome extension workspace (Go backend lives at repo root)",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --filter @continuum/web dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test"
+  }
+}

@@ -1,0 +1,89 @@
+{{- if not .Values.database.existingSecret }}
+{{- fail "database.existingSecret is required (Secret with DATABASE_URL=postgresql://…)" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "continuum.fullname" . }}
+  labels: {{- include "continuum.labels" . | nindent 4 }}
+spec:
+  replicas: 1                     # one Controller per database; PVC is ReadWriteOnce
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: {{- include "continuum.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "continuum.selector" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - { name: ENV, value: {{ .Values.env | quote }} }
+            - { name: CONTROLLER_ADDR, value: "0.0.0.0:8080" }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.database.existingSecret | quote }}, key: {{ .Values.database.key | quote }} } }
+            {{- if .Values.apiToken.existingSecret }}
+            - name: CONTINUUM_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.apiToken.existingSecret | quote }}, key: {{ .Values.apiToken.key | quote }} } }
+            {{- end }}
+            {{- if .Values.agent.enabled }}
+            - { name: CONTINUUM_AGENT_ADDR, value: ":8443" }
+            - { name: CONTINUUM_AGENT_URL, value: {{ .Values.agent.publicURL | default (printf "https://%s-agent:%d" (include "continuum.fullname" .) (int .Values.service.agentPort)) | quote }} }
+            - { name: CONTINUUM_AGENT_SANS, value: {{ .Values.agent.sans | default (printf "%s-agent" (include "continuum.fullname" .)) | quote }} }
+            {{- else }}
+            - { name: CONTINUUM_AGENT_ADDR, value: "off" }
+            {{- end }}
+            {{- if .Values.allowedOrigins }}
+            - { name: CONTINUUM_ALLOWED_ORIGINS, value: {{ .Values.allowedOrigins | quote }} }
+            {{- end }}
+            - { name: CONTINUUM_PKI_DIR, value: /data/pki }
+            - { name: CONTINUUM_ACCESS_DIR, value: /data/access }
+            - { name: CONTINUUM_SECRETS, value: file }
+            - { name: CONTINUUM_SECRETS_DIR, value: /data/secrets }
+            - { name: HOME, value: /tmp }
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - { name: api, containerPort: 8080 }
+            {{- if .Values.agent.enabled }}
+            - { name: agent, containerPort: 8443 }
+            {{- end }}
+          livenessProbe:
+            httpGet: { path: /healthz, port: api }
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /readyz, port: api }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim: { claimName: {{ .Values.persistence.existingClaim | default (include "continuum.fullname" .) }} }
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

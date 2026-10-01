@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadType</key><string>Configuration</string>
+  <key>PayloadVersion</key><integer>1</integer>
+  <key>PayloadIdentifier</key><string>com.continuum.extension-policy</string>
+  <key>PayloadUUID</key><string>7B0D3E2A-6C3B-4E7E-9C1D-2F5A8B9C0D11</string>
+  <key>PayloadDisplayName</key><string>Continuum browser extension</string>
+  <key>PayloadScope</key><string>System</string>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadType</key><string>com.google.Chrome</string>
+      <key>PayloadVersion</key><integer>1</integer>
+      <key>PayloadIdentifier</key><string>com.continuum.extension-policy.chrome</string>
+      <key>PayloadUUID</key><string>7B0D3E2A-6C3B-4E7E-9C1D-2F5A8B9C0D12</string>
+      <key>ExtensionInstallForcelist</key>
+      <array><string>EXTENSION_ID;https://clients2.google.com/service/update2/crx</string></array>
+      <key>NativeMessagingAllowlist</key>
+      <array><string>com.continuum.agent</string></array>
+    </dict>
+    <dict>
+      <key>PayloadType</key><string>com.microsoft.Edge</string>
+      <key>PayloadVersion</key><integer>1</integer>
+      <key>PayloadIdentifier</key><string>com.continuum.extension-policy.edge</string>
+      <key>PayloadUUID</key><string>7B0D3E2A-6C3B-4E7E-9C1D-2F5A8B9C0D13</string>
+      <key>ExtensionInstallForcelist</key>
+      <array><string>EXTENSION_ID;https://edge.microsoft.com/extensionwebstorebase/v1/crx</string></array>
+      <key>NativeMessagingAllowlist</key>
+      <array><string>com.continuum.agent</string></array>
+    </dict>
+  </array>
+</dict>
+</plist>

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: continuum
+description: Continuum Controller — ordinal-based cross-platform disk pooling (REST/SSE API + mTLS agent endpoint)
+type: application
+version: 0.1.0
+appVersion: "0.0.0-dev"
+keywords: [storage, disk-pool, jbod]

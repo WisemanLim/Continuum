@@ -1,0 +1,9 @@
+# Release agent image (goreleaser): docker run … ghcr.io/<owner>/continuum-agent run --controller https://controller:8443 --token <CTM1…> --root /disks/d1
+FROM gcr.io/distroless/static-debian12
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/continuum-agent /continuum-agent
+ENV CONTINUUM_AGENT_DIR=/state
+VOLUME ["/state"]
+EXPOSE 8444
+ENTRYPOINT ["/continuum-agent"]
+CMD ["run"]

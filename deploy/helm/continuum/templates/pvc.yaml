@@ -1,0 +1,14 @@
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "continuum.fullname" . }}
+  labels: {{- include "continuum.labels" . | nindent 4 }}
+  annotations: { helm.sh/resource-policy: keep }   # the private CA lives here
+spec:
+  accessModes: [{{ .Values.persistence.accessMode }}]
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources: { requests: { storage: {{ .Values.persistence.size }} } }
+{{- end }}

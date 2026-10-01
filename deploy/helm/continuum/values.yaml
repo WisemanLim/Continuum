@@ -1,0 +1,87 @@
+# Continuum Controller. Agents run on the machines that own the disks (not in this chart) and enroll with
+# `continuum node token`. Never put real secrets in this file — reference existing Secrets instead.
+image:
+  repository: continuum-controller   # built from the repo Dockerfile, target `controller`
+  tag: ""                             # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+env: prod
+
+# PostgreSQL is required for dev/staging/prod (SQLite is for local single-user mode).
+# The Secret must hold the key DATABASE_URL, e.g. postgresql://user:pass@host:5432/continuum
+database:
+  existingSecret: ""                  # required
+  key: DATABASE_URL
+
+# Optional automation token (System Admin) — Secret key CONTINUUM_TOKEN.
+apiToken:
+  existingSecret: ""
+  key: CONTINUUM_TOKEN
+
+agent:
+  enabled: true                       # mTLS endpoint for remote agents (FR-N, S03)
+  publicURL: ""                       # https://continuum-agent.example.com:8443 — what agents dial
+  sans: ""                            # extra certificate SANs, comma separated
+
+allowedOrigins: ""                    # CORS: UI / extension origins, comma separated
+extraEnv: []                          # e.g. OpenTelemetry: [{name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://otel-collector:4318"}]
+
+# /data keeps the private CA (pki), SMB access config and the server secret file (CONTINUUM_SECRETS=file:
+# there is no OS keychain in a container). Back it up together with the database.
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  apiPort: 8080
+  agentPort: 8443
+  annotations: {}
+
+# The agent port carries mTLS end to end: expose it with a LoadBalancer / TCP passthrough, not a TLS-terminating ingress.
+agentService:
+  type: ClusterIP
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: continuum.example.com
+      paths: [{ path: /, pathType: Prefix }]
+  tls: []
+
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits: { memory: 512Mi }
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile: { type: RuntimeDefault }
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+
+metrics:
+  serviceMonitor:
+    enabled: false                    # Prometheus Operator
+    interval: 30s
+    labels: {}
+    bearerTokenSecret: {}             # {name: continuum-token, key: CONTINUUM_TOKEN} when logins are enabled
+  grafanaDashboard:
+    enabled: false                    # ConfigMap picked up by the Grafana sidecar
+    labels: { grafana_dashboard: "1" }
